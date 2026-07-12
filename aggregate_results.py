@@ -48,9 +48,11 @@ for fold in range(3):
         'Precision':  metrics_1.get('Precision', None),
         'Recall':     metrics_1.get('Recall', None),
     }
+    hd = fold_metrics[fold]['HD95']
+    hd_str = f"{hd:.2f}" if hd is not None else "N/A"
     print(f"Fold {fold}: Dice={fold_metrics[fold]['Dice']:.4f}  "
           f"IoU={fold_metrics[fold]['IoU']:.4f}  "
-          f"HD95={fold_metrics[fold]['HD95']:.2f}")
+          f"HD95={hd_str}")
 
 if not fold_metrics:
     print("No fold results found. Train all 3 folds first, then run this script.")
@@ -83,13 +85,21 @@ with open('results/baseline_metrics.json', 'w') as f:
 print("\nSaved results/baseline_metrics.json")
 
 # ── Figure: fold comparison bar chart ─────────────────────────────────────────
-fig, axes = plt.subplots(1, 3, figsize=(12, 4))
 metric_plot = ['Dice', 'IoU', 'HD95']
-colors = ['#2196F3', '#4CAF50', '#FF9800']
-for ax, metric, color in zip(axes, metric_plot, colors):
+available_metrics = [m for m in metric_plot if any(
+    fold_metrics[f][m] is not None for f in fold_metrics)]
+colors_all = {'Dice': '#2196F3', 'IoU': '#4CAF50', 'HD95': '#FF9800'}
+
+fig, axes = plt.subplots(1, len(available_metrics), figsize=(5 * len(available_metrics), 4))
+if len(available_metrics) == 1:
+    axes = [axes]
+
+for ax, metric in zip(axes, available_metrics):
+    color = colors_all[metric]
     folds = sorted(fold_metrics.keys())
+    fold_labels = [f"Fold {f}" for f in folds if fold_metrics[f][metric] is not None]
     vals  = [fold_metrics[f][metric] for f in folds if fold_metrics[f][metric] is not None]
-    bars  = ax.bar([f"Fold {f}" for f in folds], vals, color=color, alpha=0.85)
+    bars  = ax.bar(fold_labels, vals, color=color, alpha=0.85)
     if metric in agg:
         ax.axhline(agg[metric]['mean'], color='red', linestyle='--', lw=1.2,
                    label=f"Mean={agg[metric]['mean']:.3f}")

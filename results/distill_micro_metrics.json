@@ -1,0 +1,10 @@
+{
+  "student": "micro",
+  "best_dice": 0.871121081146034,
+  "size_mb": 7.458804130554199,
+  "cpu_latency_ms": 53.61459732055664,
+  "params_M": 1.942289,
+  "alpha": 0.5,
+  "temperature": 2.0,
+  "teacher": "models/unet_full_best.pth"
+}

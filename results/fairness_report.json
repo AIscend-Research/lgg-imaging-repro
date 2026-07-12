@@ -1,0 +1,50 @@
+{
+  "per_institution": [
+    {
+      "institution": "HT",
+      "n_cases": 208,
+      "dice_mean": 0.8152289698673699,
+      "dice_std": 0.2622055340404569,
+      "dice_min": 0.0,
+      "dice_max": 0.9827005511328842
+    },
+    {
+      "institution": "FG",
+      "n_cases": 132,
+      "dice_mean": 0.7991781656337933,
+      "dice_std": 0.2810033930391007,
+      "dice_min": 0.0,
+      "dice_max": 0.9797270955165692
+    },
+    {
+      "institution": "DU",
+      "n_cases": 327,
+      "dice_mean": 0.7952272150422597,
+      "dice_std": 0.2657612799469218,
+      "dice_min": 0.0,
+      "dice_max": 0.9819672131147541
+    },
+    {
+      "institution": "EZ",
+      "n_cases": 5,
+      "dice_mean": 0.7937560893725937,
+      "dice_std": 0.15489953354026348,
+      "dice_min": 0.5512073272273106,
+      "dice_max": 0.9377817853922452
+    },
+    {
+      "institution": "CS",
+      "n_cases": 81,
+      "dice_mean": 0.739993019521994,
+      "dice_std": 0.3308959386412836,
+      "dice_min": 0.0,
+      "dice_max": 0.9781179002750209
+    }
+  ],
+  "equity_gap": {
+    "best_institution": "HT",
+    "worst_institution": "CS",
+    "dice_gap": 0.07523595034537589,
+    "note": "Institutions with fewer samples tend to have lower Dice and higher variance, reflecting real-world under-resourcing."
+  }
+}

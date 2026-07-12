@@ -42,6 +42,9 @@ if not os.path.exists(args.metadata):
     exit(1)
 
 meta = pd.read_csv(args.metadata)
+# Derive institution from patient ID: TCGA_CS_4941_... -> 'CS'
+if 'institution' not in meta.columns:
+    meta['institution'] = meta['patient'].str.split('_').str[1]
 print(f"Loaded metadata: {len(meta)} cases, {meta['institution'].nunique()} institutions")
 
 # ── Load per-case validation metrics from nnU-Net ────────────────────────────
@@ -94,10 +97,9 @@ if not all_case_metrics:
     print("NOTE: Using simulated data. Replace with real fold results after training.")
 else:
     results_df = pd.DataFrame(all_case_metrics)
-    results_df = results_df.merge(
-        meta[['case_id', 'institution', 'has_tumor', 'tumor_fraction']],
-        on='case_id', how='left'
-    )
+    merge_cols = ['case_id', 'institution'] + [
+        c for c in ['has_tumor', 'tumor_fraction'] if c in meta.columns]
+    results_df = results_df.merge(meta[merge_cols], on='case_id', how='left')
 
 # ── Per-institution analysis ──────────────────────────────────────────────────
 inst_summary = results_df.groupby('institution').agg(
