@@ -1,0 +1,92 @@
+{
+  "n_patients": 99,
+  "n_tumor_slices": 713,
+  "subgroups": {
+    "genomic_RNASeqCluster": [
+      {
+        "group": "RNASeq-1",
+        "dice_mean": 0.8584566466443989,
+        "dice_std": 0.08785158497200665,
+        "n_patients": 23
+      },
+      {
+        "group": "RNASeq-2",
+        "dice_mean": 0.8355235861232393,
+        "dice_std": 0.10735284876136433,
+        "n_patients": 26
+      },
+      {
+        "group": "RNASeq-4",
+        "dice_mean": 0.8147508658224182,
+        "dice_std": 0.10257152156474715,
+        "n_patients": 25
+      },
+      {
+        "group": "RNASeq-3",
+        "dice_mean": 0.7817929616559031,
+        "dice_std": 0.15554638623280093,
+        "n_patients": 10
+      }
+    ],
+    "histologic_grade": [
+      {
+        "group": "grade=1",
+        "dice_mean": 0.8414730565567355,
+        "dice_std": 0.10696825032626199,
+        "n_patients": 46
+      },
+      {
+        "group": "grade=2",
+        "dice_mean": 0.8217761190737265,
+        "dice_std": 0.11037525655395664,
+        "n_patients": 52
+      }
+    ],
+    "gender": [
+      {
+        "group": "Gender group 2",
+        "dice_mean": 0.840412471123499,
+        "dice_std": 0.10684002238300601,
+        "n_patients": 48
+      },
+      {
+        "group": "Gender group 1",
+        "dice_mean": 0.822006403590313,
+        "dice_std": 0.11073434033040347,
+        "n_patients": 50
+      }
+    ],
+    "age_group": [
+      {
+        "group": ">70",
+        "dice_mean": 0.8749332174891626,
+        "dice_std": 0.0,
+        "n_patients": 1
+      },
+      {
+        "group": "55-70",
+        "dice_mean": 0.8406355463994796,
+        "dice_std": 0.10594091893915356,
+        "n_patients": 28
+      },
+      {
+        "group": "<40",
+        "dice_mean": 0.8289805125460027,
+        "dice_std": 0.10751037450221264,
+        "n_patients": 39
+      },
+      {
+        "group": "40-55",
+        "dice_mean": 0.8232383429158303,
+        "dice_std": 0.11514877056325212,
+        "n_patients": 30
+      }
+    ]
+  },
+  "disparity_gaps": {
+    "genomic": 0.07666368498849585,
+    "grade": 0.019696937483009047,
+    "gender": 0.018406067533186077,
+    "age": 0.01739720348364926
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "fold": 0,
+  "overall": {
+    "Dice": 0.8104249792618866,
+    "IoU": 0.7375307801799789,
+    "Precision": 0.916126493797118,
+    "Recall": 0.9044830757004383,
+    "n_cases": 699
+  },
+  "tumor_slice_dice_mean": 0.838986212011204,
+  "tumor_slice_count": 227,
+  "per_institution": [
+    {
+      "institution": "EZ",
+      "n_cases": 1,
+      "dice_mean": 0.9377817853922452,
+      "dice_std": NaN,
+      "iou_mean": 0.8828522920203735
+    },
+    {
+      "institution": "FG",
+      "n_cases": 30,
+      "dice_mean": 0.8597713231658086,
+      "dice_std": 0.1741165913158023,
+      "iou_mean": 0.7839994975754234
+    },
+    {
+      "institution": "HT",
+      "n_cases": 63,
+      "dice_mean": 0.8547412600942438,
+      "dice_std": 0.16492410299401541,
+      "iou_mean": 0.7721854575812178
+    },
+    {
+      "institution": "DU",
+      "n_cases": 100,
+      "dice_mean": 0.8417022341766395,
+      "dice_std": 0.2103345783220144,
+      "iou_mean": 0.7658855012963389
+    },
+    {
+      "institution": "CS",
+      "n_cases": 33,
+      "dice_mean": 0.7787886618962275,
+      "dice_std": 0.32148212310143126,
+      "iou_mean": 0.7175958232048889
+    }
+  ],
+  "by_tumor_size": [
+    {
+      "size_bucket": "XS (<200)",
+      "n_cases": 8,
+      "dice_mean": 0.5443514671195063,
+      "dice_std": 0.3510651428111341
+    },
+    {
+      "size_bucket": "S (200-500)",
+      "n_cases": 36,
+      "dice_mean": 0.6276346705029819,
+      "dice_std": 0.3463451962452729
+    },
+    {
+      "size_bucket": "M (500-1k)",
+      "n_cases": 30,
+      "dice_mean": 0.8047139606035522,
+      "dice_std": 0.18239849243385164
+    },
+    {
+      "size_bucket": "L (1k-2k)",
+      "n_cases": 62,
+      "dice_mean": 0.8853415445141505,
+      "dice_std": 0.12272009734269301
+    },
+    {
+      "size_bucket": "XL (>2k)",
+      "n_cases": 91,
+      "dice_mean": 0.9282155568516047,
+      "dice_std": 0.05488374091870344
+    }
+  ],
+  "target_dice_range": [
+    0.82,
+    0.92
+  ]
+}

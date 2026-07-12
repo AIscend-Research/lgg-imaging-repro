@@ -1,0 +1,40 @@
+{
+  "total_patients": 110,
+  "total_slices": 3929,
+  "tumor_slices": 1373,
+  "no_tumor_slices": 2556,
+  "institutions": [
+    {
+      "institution": "DU",
+      "n_patients": 45,
+      "n_slices": 1878,
+      "mean_tumor_prevalence": 0.3311831701424798
+    },
+    {
+      "institution": "HT",
+      "n_patients": 34,
+      "n_slices": 1029,
+      "mean_tumor_prevalence": 0.40562819001118233
+    },
+    {
+      "institution": "CS",
+      "n_patients": 16,
+      "n_slices": 358,
+      "mean_tumor_prevalence": 0.3388443169149691
+    },
+    {
+      "institution": "FG",
+      "n_patients": 14,
+      "n_slices": 640,
+      "mean_tumor_prevalence": 0.3430379099889575
+    },
+    {
+      "institution": "EZ",
+      "n_patients": 1,
+      "n_slices": 24,
+      "mean_tumor_prevalence": 0.25
+    }
+  ],
+  "slices_per_patient_mean": 35.71818181818182,
+  "slices_per_patient_std": 15.193632066740424
+}

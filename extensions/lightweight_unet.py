@@ -14,12 +14,17 @@ Usage:
         --epochs  30
 
     python extensions/lightweight_unet.py --mode benchmark
+
+This module is import-safe: classes/functions are defined at module level and
+the training/benchmark code only runs under `if __name__ == '__main__'`, so
+distill.py / quantize_model.py / compression_equity.py can import from it
+without triggering a training run.
 """
 
 import os
-import argparse
 import time
 import json
+import tempfile
 import numpy as np
 import torch
 import torch.nn as nn
@@ -28,27 +33,9 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
-from sklearn.metrics import jaccard_score
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
-os.makedirs('models',  exist_ok=True)
-os.makedirs('results', exist_ok=True)
-os.makedirs('figures', exist_ok=True)
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--mode',      default='train', choices=['train', 'benchmark'])
-parser.add_argument('--variant',   default='slim',  choices=['full', 'slim', 'micro'])
-parser.add_argument('--datapath',  default='data/raw/kaggle_3m', type=str)
-parser.add_argument('--epochs',    default=30, type=int)
-parser.add_argument('--lr',        default=1e-4, type=float)
-parser.add_argument('--batch',     default=16, type=int)
-parser.add_argument('--seed',      default=42, type=int)
-args = parser.parse_args()
-torch.manual_seed(args.seed)
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Device: {DEVICE}")
 
 # ── Architecture ──────────────────────────────────────────────────────────────
 CHANNEL_CONFIGS = {
@@ -137,7 +124,7 @@ def collect_pairs(datapath, tumor_only=False):
                     pairs.append((os.path.join(ppath, f), mp))
     return pairs
 
-# ── Loss ──────────────────────────────────────────────────────────────────────
+# ── Loss / metric ─────────────────────────────────────────────────────────────
 def dice_loss(pred, target, smooth=1):
     pred   = torch.sigmoid(pred)
     inter  = (pred * target).sum(dim=(2, 3))
@@ -153,112 +140,141 @@ def dice_score(pred_logits, target):
     union = pred.sum(dim=(2, 3)) + target.sum(dim=(2, 3))
     return ((2 * inter + 1) / (union + 1)).mean().item()
 
-# ── Model size ────────────────────────────────────────────────────────────────
+# ── Size / latency helpers ────────────────────────────────────────────────────
 def model_size_mb(model):
-    path = 'models/_tmp.pth'
+    with tempfile.NamedTemporaryFile(suffix='.pth', delete=False) as tmp:
+        path = tmp.name
     torch.save(model.state_dict(), path)
     size = os.path.getsize(path) / 1024 / 1024
     os.remove(path)
     return size
 
 def inference_time_ms(model, device, n=50):
+    """Benchmark on `device`, moving the model there and restoring it after."""
+    orig = next(model.parameters()).device
+    model = model.to(device)
     model.eval()
-    dummy = torch.randn(1, 1, 256, 256).to(device)
+    dummy = torch.randn(1, 1, 256, 256, device=device)
     with torch.no_grad():
         for _ in range(5): model(dummy)  # warmup
+        if device.type == 'cuda': torch.cuda.synchronize()
         start = time.time()
         for _ in range(n): model(dummy)
+        if device.type == 'cuda': torch.cuda.synchronize()
         elapsed = (time.time() - start) / n * 1000
+    model.to(orig)
     return elapsed
 
-# ── Benchmark mode ────────────────────────────────────────────────────────────
-if args.mode == 'benchmark':
-    print("\n--- Architecture Benchmark ---")
-    bench = {}
-    for name, channels in CHANNEL_CONFIGS.items():
-        m = UNet(channels).to(DEVICE)
-        n_params = sum(p.numel() for p in m.parameters()) / 1e6
-        size_mb  = model_size_mb(m)
-        lat_ms   = inference_time_ms(m, DEVICE)
-        cpu_lat  = inference_time_ms(m, torch.device('cpu'))
-        bench[name] = {'params_M': n_params, 'size_mb': size_mb,
-                       'gpu_ms': lat_ms, 'cpu_ms': cpu_lat}
-        print(f"  {name:<8}: {n_params:.2f}M params  {size_mb:.1f} MB  "
-              f"GPU: {lat_ms:.1f}ms  CPU: {cpu_lat:.0f}ms")
-    with open('results/architecture_benchmark.json', 'w') as f:
-        json.dump(bench, f, indent=2)
-    print("Saved results/architecture_benchmark.json")
-    exit(0)
 
-# ── Training mode ─────────────────────────────────────────────────────────────
-print(f"\nTraining {args.variant} U-Net for {args.epochs} epochs...")
-all_pairs = collect_pairs(args.datapath)
-np.random.seed(args.seed)
-np.random.shuffle(all_pairs)
-split = int(0.85 * len(all_pairs))
-train_ds = LGGDataset(all_pairs[:split])
-val_ds   = LGGDataset(all_pairs[split:])
-train_loader = DataLoader(train_ds, batch_size=args.batch, shuffle=True,  num_workers=0)
-val_loader   = DataLoader(val_ds,   batch_size=args.batch, shuffle=False, num_workers=0)
-print(f"Train: {len(train_ds)}  Val: {len(val_ds)}")
+# ── CLI (only runs when executed directly, not on import) ─────────────────────
+if __name__ == '__main__':
+    import argparse
 
-model     = UNet(CHANNEL_CONFIGS[args.variant]).to(DEVICE)
-optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
-n_params  = sum(p.numel() for p in model.parameters()) / 1e6
-print(f"Parameters: {n_params:.2f}M")
+    os.makedirs('models',  exist_ok=True)
+    os.makedirs('results', exist_ok=True)
+    os.makedirs('figures', exist_ok=True)
 
-train_losses, val_dices = [], []
-best_dice = 0
-for epoch in range(args.epochs):
-    model.train()
-    total_loss = 0
-    for imgs, masks in tqdm(train_loader, desc=f"Epoch {epoch+1}", leave=False):
-        imgs, masks = imgs.to(DEVICE), masks.to(DEVICE)
-        optimizer.zero_grad()
-        loss = combined_loss(model(imgs), masks)
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
-    scheduler.step()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mode',      default='train', choices=['train', 'benchmark'])
+    parser.add_argument('--variant',   default='slim',  choices=['full', 'slim', 'micro'])
+    parser.add_argument('--datapath',  default='data/raw/kaggle_3m', type=str)
+    parser.add_argument('--epochs',    default=30, type=int)
+    parser.add_argument('--lr',        default=1e-4, type=float)
+    parser.add_argument('--batch',     default=16, type=int)
+    parser.add_argument('--seed',      default=42, type=int)
+    args = parser.parse_args()
+    torch.manual_seed(args.seed)
+    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {DEVICE}")
 
-    model.eval()
-    val_dice_total = 0
-    with torch.no_grad():
-        for imgs, masks in val_loader:
+    # ── Benchmark mode ────────────────────────────────────────────────────────
+    if args.mode == 'benchmark':
+        print("\n--- Architecture Benchmark ---")
+        bench = {}
+        for name, channels in CHANNEL_CONFIGS.items():
+            m = UNet(channels).to(DEVICE)
+            n_params = sum(p.numel() for p in m.parameters()) / 1e6
+            size_mb  = model_size_mb(m)
+            lat_ms   = inference_time_ms(m, DEVICE)
+            cpu_lat  = inference_time_ms(m, torch.device('cpu'))
+            bench[name] = {'params_M': n_params, 'size_mb': size_mb,
+                           'gpu_ms': lat_ms, 'cpu_ms': cpu_lat}
+            print(f"  {name:<8}: {n_params:.2f}M params  {size_mb:.1f} MB  "
+                  f"GPU: {lat_ms:.1f}ms  CPU: {cpu_lat:.0f}ms")
+        with open('results/architecture_benchmark.json', 'w') as f:
+            json.dump(bench, f, indent=2)
+        print("Saved results/architecture_benchmark.json")
+        raise SystemExit(0)
+
+    # ── Training mode ─────────────────────────────────────────────────────────
+    print(f"\nTraining {args.variant} U-Net for {args.epochs} epochs...")
+    all_pairs = collect_pairs(args.datapath)
+    np.random.seed(args.seed)
+    np.random.shuffle(all_pairs)
+    split = int(0.85 * len(all_pairs))
+    train_ds = LGGDataset(all_pairs[:split])
+    val_ds   = LGGDataset(all_pairs[split:])
+    train_loader = DataLoader(train_ds, batch_size=args.batch, shuffle=True,  num_workers=0)
+    val_loader   = DataLoader(val_ds,   batch_size=args.batch, shuffle=False, num_workers=0)
+    print(f"Train: {len(train_ds)}  Val: {len(val_ds)}")
+
+    model     = UNet(CHANNEL_CONFIGS[args.variant]).to(DEVICE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    n_params  = sum(p.numel() for p in model.parameters()) / 1e6
+    print(f"Parameters: {n_params:.2f}M")
+
+    train_losses, val_dices = [], []
+    best_dice = 0
+    for epoch in range(args.epochs):
+        model.train()
+        total_loss = 0
+        for imgs, masks in tqdm(train_loader, desc=f"Epoch {epoch+1}", leave=False):
             imgs, masks = imgs.to(DEVICE), masks.to(DEVICE)
-            val_dice_total += dice_score(model(imgs), masks)
-    vd = val_dice_total / len(val_loader)
-    tl = total_loss / len(train_loader)
-    train_losses.append(tl)
-    val_dices.append(vd)
-    print(f"Epoch {epoch+1}/{args.epochs}  Loss: {tl:.4f}  Val Dice: {vd:.4f}")
-    if vd > best_dice:
-        best_dice = vd
-        torch.save(model.state_dict(), f'models/unet_{args.variant}_best.pth')
+            optimizer.zero_grad()
+            loss = combined_loss(model(imgs), masks)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        scheduler.step()
 
-print(f"\nBest Val Dice: {best_dice:.4f}")
-size_mb = model_size_mb(model)
-lat_cpu = inference_time_ms(model, torch.device('cpu'))
-print(f"Model size: {size_mb:.2f} MB  CPU latency: {lat_cpu:.0f} ms/slice")
+        model.eval()
+        val_dice_total = 0
+        with torch.no_grad():
+            for imgs, masks in val_loader:
+                imgs, masks = imgs.to(DEVICE), masks.to(DEVICE)
+                val_dice_total += dice_score(model(imgs), masks)
+        vd = val_dice_total / len(val_loader)
+        tl = total_loss / len(train_loader)
+        train_losses.append(tl)
+        val_dices.append(vd)
+        print(f"Epoch {epoch+1}/{args.epochs}  Loss: {tl:.4f}  Val Dice: {vd:.4f}")
+        if vd > best_dice:
+            best_dice = vd
+            torch.save(model.state_dict(), f'models/unet_{args.variant}_best.pth')
 
-with open(f'results/unet_{args.variant}_metrics.json', 'w') as f:
-    json.dump({'variant': args.variant, 'best_dice': best_dice,
-               'size_mb': size_mb, 'cpu_latency_ms': lat_cpu,
-               'params_M': n_params}, f, indent=2)
+    print(f"\nBest Val Dice: {best_dice:.4f}")
+    size_mb = model_size_mb(model)
+    lat_cpu = inference_time_ms(model, torch.device('cpu'))
+    print(f"Model size: {size_mb:.2f} MB  CPU latency: {lat_cpu:.0f} ms/slice")
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-ax1.plot(train_losses, color='#F44336', lw=2)
-ax1.set_xlabel('Epoch'); ax1.set_ylabel('Combined Loss')
-ax1.set_title(f'{args.variant.capitalize()} U-Net Training Loss')
-ax1.grid(alpha=0.3)
-ax2.plot(val_dices, color='#4CAF50', lw=2)
-ax2.axhline(0.82, color='red', linestyle=':', lw=1, label='Target 0.82')
-ax2.set_xlabel('Epoch'); ax2.set_ylabel('Dice Score')
-ax2.set_title('Validation Dice')
-ax2.legend(); ax2.grid(alpha=0.3)
-plt.suptitle(f'{args.variant.capitalize()} U-Net Training Curves', fontweight='bold')
-plt.tight_layout()
-plt.savefig(f'figures/unet_{args.variant}_training.png', dpi=150)
-plt.close()
-print(f"Saved figures/unet_{args.variant}_training.png")
+    with open(f'results/unet_{args.variant}_metrics.json', 'w') as f:
+        json.dump({'variant': args.variant, 'best_dice': best_dice,
+                   'size_mb': size_mb, 'cpu_latency_ms': lat_cpu,
+                   'params_M': n_params}, f, indent=2)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    ax1.plot(train_losses, color='#F44336', lw=2)
+    ax1.set_xlabel('Epoch'); ax1.set_ylabel('Combined Loss')
+    ax1.set_title(f'{args.variant.capitalize()} U-Net Training Loss')
+    ax1.grid(alpha=0.3)
+    ax2.plot(val_dices, color='#4CAF50', lw=2)
+    ax2.axhline(0.82, color='red', linestyle=':', lw=1, label='Target 0.82')
+    ax2.set_xlabel('Epoch'); ax2.set_ylabel('Dice Score')
+    ax2.set_title('Validation Dice')
+    ax2.legend(); ax2.grid(alpha=0.3)
+    plt.suptitle(f'{args.variant.capitalize()} U-Net Training Curves', fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(f'figures/unet_{args.variant}_training.png', dpi=150)
+    plt.close()
+    print(f"Saved figures/unet_{args.variant}_training.png")

@@ -1,0 +1,85 @@
+{
+  "fold": 1,
+  "overall": {
+    "Dice": 0.7655041241491739,
+    "IoU": 0.6937030761456271,
+    "Precision": 0.9203250733313345,
+    "Recall": 0.8956522302404707,
+    "n_cases": 702
+  },
+  "tumor_slice_dice_mean": 0.8273959469527241,
+  "tumor_slice_count": 235,
+  "per_institution": [
+    {
+      "institution": "HT",
+      "n_cases": 61,
+      "dice_mean": 0.8476792065812938,
+      "dice_std": 0.21710199268236705,
+      "iou_mean": 0.7764882848318905
+    },
+    {
+      "institution": "FG",
+      "n_cases": 46,
+      "dice_mean": 0.8357645855732245,
+      "dice_std": 0.2427093477601494,
+      "iou_mean": 0.7671618003235807
+    },
+    {
+      "institution": "DU",
+      "n_cases": 104,
+      "dice_mean": 0.8334399118831186,
+      "dice_std": 0.19914609901785793,
+      "iou_mean": 0.7503728786300906
+    },
+    {
+      "institution": "EZ",
+      "n_cases": 3,
+      "dice_mean": 0.7502688817669801,
+      "dice_std": 0.18624535577050957,
+      "iou_mean": 0.6237413018006811
+    },
+    {
+      "institution": "CS",
+      "n_cases": 21,
+      "dice_mean": 0.7312327388056021,
+      "dice_std": 0.31661484580267196,
+      "iou_mean": 0.6493023746870377
+    }
+  ],
+  "by_tumor_size": [
+    {
+      "size_bucket": "XS (<200)",
+      "n_cases": 19,
+      "dice_mean": 0.528850025426761,
+      "dice_std": 0.3468327537740046
+    },
+    {
+      "size_bucket": "S (200-500)",
+      "n_cases": 27,
+      "dice_mean": 0.6921065844750464,
+      "dice_std": 0.3140833082342171
+    },
+    {
+      "size_bucket": "M (500-1k)",
+      "n_cases": 40,
+      "dice_mean": 0.7580766175215299,
+      "dice_std": 0.25542878620691445
+    },
+    {
+      "size_bucket": "L (1k-2k)",
+      "n_cases": 54,
+      "dice_mean": 0.8817720915322257,
+      "dice_std": 0.11185281538182051
+    },
+    {
+      "size_bucket": "XL (>2k)",
+      "n_cases": 95,
+      "dice_mean": 0.9238343329089903,
+      "dice_std": 0.07447625354860764
+    }
+  ],
+  "target_dice_range": [
+    0.82,
+    0.92
+  ]
+}
