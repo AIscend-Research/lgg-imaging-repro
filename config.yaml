@@ -1,0 +1,39 @@
+# Single source of truth for the reproduction (R7). Everything runs from here.
+seed: 42
+
+paths:
+  datapath: data/lgg-mri-segmentation/kaggle_3m   # extracted Kaggle folder
+  manifest: reports/manifest.csv
+  splits: splits/splits.json
+  ckpt_dir: checkpoints
+  reports: reports
+  figures: figures
+
+data:
+  in_channels: 3        # 3 = pre/FLAIR/post (public benchmark, headline); 1 = FLAIR-only (R9)
+
+splits:
+  preset: kfold5        # kfold5 (default) or buda22 (paper-exact 22x5)
+  seed: 42
+  stratify_by_site: false
+
+train:
+  epochs: 60
+  batch_size: 16
+  lr: 0.001
+  channels: reference   # reference[32,64,128,256] | full | slim | micro
+  batchnorm: true       # ON = public-repo variant; false = strictly-paper net
+  augment: true
+  amp: true
+  num_workers: 2
+  foreground_bias: 0.0  # >0 up-weights tumor slices WITHOUT discarding empties (R5)
+  dice_weight: 1.0
+  bce_weight: 1.0
+  grad_clip: 0.0
+  pretrained_encoder: false   # MUST stay false for the faithful reproduction (R4)
+
+distill:
+  student_channels: micro
+  epochs: 30
+  temperature: 2.0
+  alpha: 0.5

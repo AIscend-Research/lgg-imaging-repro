@@ -1,5 +1,18 @@
 __pycache__/
 *.pyc
-models/
-deploy/
+/models/
+/deploy/
 
+# Reproduction pipeline: data + large training artifacts (kept out of git).
+# Anchored to repo root so src/lgg/data and src/lgg/models are NOT ignored.
+/data/
+/checkpoints/
+*.pt
+*.pth
+/_run/
+.venv/
+.pytest_cache/
+
+# nnU-Net raw/preprocessed trees (regenerated locally).
+/nnunet_data/
+/nnunet_preprocessed/

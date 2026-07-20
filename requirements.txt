@@ -1,17 +1,19 @@
-torch>=2.0.0
-torchvision>=0.15.0
-numpy>=1.24.0
-nibabel>=5.0.0
-SimpleITK>=2.2.0
-Pillow>=9.0.0
-scikit-image>=0.20.0
-scikit-learn>=1.2.0
-matplotlib>=3.7.0
-pandas>=2.0.0
-scipy>=1.10.0
-tqdm>=4.65.0
-opencv-python>=4.7.0
-onnx>=1.14.0
-onnxruntime>=1.15.0
-seaborn>=0.12.0
-nnunetv2>=2.2
+# Core reproduction pipeline (R7 — pinned for the environment we ran on).
+torch>=2.1,<2.9
+torchvision>=0.16
+numpy>=1.24,<2.1
+pandas>=2.0
+Pillow>=9.5
+scipy>=1.10
+scikit-image>=0.20
+scikit-learn>=1.2
+matplotlib>=3.7
+PyYAML>=6.0
+tqdm>=4.65
+medpy>=0.4.0          # HD95 (R3); pipeline degrades gracefully if absent
+pytest>=7.4
+
+# Optional — only for the nnU-Net comparison module (Section 8) and NIfTI I/O.
+# nnunetv2>=2.2
+# nibabel>=5.0
+# SimpleITK>=2.2
