@@ -34,17 +34,20 @@ def _json_default(o):
     raise TypeError(str(type(o)))
 
 
-def write_comparison_md(path: str, summary: dict, meta: dict) -> None:
+def write_comparison_md(path: str, summary: dict, meta: dict, radiogenomics: Optional[dict] = None) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     mean_d = summary["dice_mean"]
     med_d = summary["dice_median"]
     lines = []
-    lines.append("# Reproduction comparison — Buda et al. (2019) segmentation\n")
+    kind = "full" if radiogenomics else "partial"
+    lines.append("# Reproduction comparison — Buda et al. (2019)\n")
     lines.append(
-        "Partial replication (segmentation only). Headline metric is **per-patient "
-        "(volume-aggregated) Dice** over the 110 patients, patient-level "
-        f"cross-validation (`{meta.get('preset')}`, seed {meta.get('seed')}, "
-        f"{meta.get('in_channels')}-channel input).\n"
+        f"**{kind.capitalize()} replication.** This covers the segmentation result and"
+        + (" the radiogenomics association (the paper's actual headline claim)."
+           if radiogenomics else " (segmentation only; radiogenomics not run).")
+        + " The segmentation headline metric is **per-patient (volume-aggregated) Dice** "
+        f"over the 110 patients, patient-level cross-validation (`{meta.get('preset')}`, "
+        f"seed {meta.get('seed')}, {meta.get('in_channels')}-channel input).\n"
     )
     lines.append("## Headline: per-patient Dice vs paper target\n")
     lines.append("| Metric | Paper (target) | This work | Δ |")
@@ -70,11 +73,69 @@ def write_comparison_md(path: str, summary: dict, meta: dict) -> None:
     lines.append(f"- All slices (tumor + empty): {summary.get('per_slice_dice_all_mean', float('nan')):.3f}")
     lines.append(f"- Tumor-bearing slices only: {summary.get('per_slice_dice_tumor_mean', float('nan')):.3f}\n")
 
+    if radiogenomics:
+        lines.extend(_radiogenomics_md(radiogenomics))
+
     verdict = "within" if abs(mean_d - TARGET_MEAN_DICE) <= 0.03 else "off"
-    lines.append(f"**Verdict:** per-patient mean Dice {mean_d:.3f} is {verdict} the paper's 0.82 "
-                 f"(Δ {mean_d - TARGET_MEAN_DICE:+.3f}).\n")
+    lines.append(f"**Segmentation verdict:** per-patient mean Dice {mean_d:.3f} is {verdict} the "
+                 f"paper's 0.82 (Δ {mean_d - TARGET_MEAN_DICE:+.3f}).\n")
     with open(path, "w") as fh:
         fh.write("\n".join(lines))
+
+
+def _pass_note(ours: Optional[float], target: float, smaller_is_better: bool) -> str:
+    if ours is None:
+        return "n/a"
+    hit = (ours <= target) if smaller_is_better else (ours >= target)
+    if hit:
+        return "pass"
+    near = ours <= target * 3 if smaller_is_better else ours >= target - 0.05
+    return "near" if near else "miss"
+
+
+def _radiogenomics_md(rg: dict) -> list:
+    """Section 7 comparison: our associations/AUCs vs the paper, predicted & GT."""
+    ref = rg.get("paper_reference", {})
+    lines = ["## Radiogenomics — the paper's headline claim (Section 7)\n"]
+    lines.append("Shape features of the tumor mask vs genomic subtype, for **predicted** and "
+                 "**ground-truth** masks. The paper's point is that the automatic masks preserve "
+                 "the associations about as well as the manual ones.\n")
+
+    # Primary associations (RNASeq × BEVR, RNASeq × margin fluctuation).
+    lines.append("### Primary Fisher associations (Bonferroni-corrected)\n")
+    lines.append("| Association | Paper p | Predicted p | GT p | Note (predicted) |")
+    lines.append("|---|---|---|---|---|")
+    pairs = [("RNASeqCluster", "bevr", ref.get("rnaseq_x_bevr_p", 0.0002), "RNASeq × BEVR"),
+             ("RNASeqCluster", "margin_fluctuation", ref.get("rnaseq_x_margin_fluctuation_p", 0.005),
+              "RNASeq × margin fluctuation")]
+    for sub, feat, paper_p, label in pairs:
+        def _p(mask):
+            best = rg["masks"][mask]["associations"]["best_per_pair"]
+            r = next((x for x in best if x["subtype"] == sub and x["feature"] == feat), None)
+            return r["p_bonferroni"] if r else None
+        pp, gp = _p("predicted"), _p("ground_truth")
+        note = _pass_note(pp, paper_p, smaller_is_better=True)
+        lines.append(f"| {label} | < {paper_p} | {_fmt_p(pp)} | {_fmt_p(gp)} | {note} |")
+
+    # Discrimination AUC (cluster R2 vs rest, inverse BEVR).
+    lines.append("\n### Discrimination AUC (cluster ~R2 vs rest, inverse BEVR)\n")
+    lines.append("| Mask | Paper AUC | This work | Note |")
+    lines.append("|---|---|---|---|")
+    for mask, paper_auc, name in (("predicted", ref.get("auc_model", 0.80), "model / predicted"),
+                                  ("ground_truth", ref.get("auc_manual", 0.78), "manual / GT")):
+        a = rg["masks"][mask]["discrimination_auc"]
+        ours = a.get("auc") if a else None
+        note = _pass_note(ours, paper_auc - 0.05, smaller_is_better=False)
+        lines.append(f"| {name} | {paper_auc:.2f} | {ours:.3f} | {note} |" if ours is not None
+                     else f"| {name} | {paper_auc:.2f} | n/a | n/a |")
+    lines.append("")
+    return lines
+
+
+def _fmt_p(p: Optional[float]) -> str:
+    if p is None:
+        return "n/a"
+    return f"{p:.2e}" if p < 0.01 else f"{p:.3f}"
 
 
 # ---------------------------------------------------------------- figures ----

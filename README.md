@@ -1,6 +1,6 @@
-# [Re] Automatic segmentation of lower-grade gliomas (TCGA-LGG)
+# [Re] Association of genomic subtypes of lower-grade gliomas with shape features (TCGA-LGG)
 
-A **ReScience C** partial replication of the **segmentation** result of:
+A **ReScience C** **full replication** of:
 
 > Buda, M., Saha, A., & Mazurowski, M. A. (2019). *Association of genomic subtypes of
 > lower-grade gliomas with shape features automatically extracted by a deep learning
@@ -8,16 +8,23 @@ A **ReScience C** partial replication of the **segmentation** result of:
 > doi:[10.1016/j.compbiomed.2019.05.002](https://doi.org/10.1016/j.compbiomed.2019.05.002)
 
 We reimplement the paper's plain 4-level U-Net from the architecture description (this is an
-**independent implementation**, not the authors' code) and reproduce its automatic
-FLAIR-abnormality segmentation performance: **mean Dice 0.82, median Dice 0.85, computed
-per patient under patient-level cross-validation**. On top of the faithful reproduction we
-scaffold low-resource-deployment extensions (robustness, quantization, distillation,
-cross-institution) built on the *same* leakage-safe splits.
+**independent implementation**, not the authors' code) and reproduce **both** parts of the
+paper:
 
-> **Scope.** This is a **partial replication**: it covers the segmentation result only. The
-> paper's headline *radiogenomics* claim (shape features predicting genomic subtype) is out
-> of scope unless the optional module in [`src/lgg`](src/lgg) Section 9 is run. See
-> **Deviations** below.
+1. **Segmentation** — automatic FLAIR-abnormality segmentation, **mean Dice 0.82, median
+   0.85, computed per patient under patient-level cross-validation**.
+2. **Radiogenomics (the paper's actual headline claim)** — shape features of the segmented
+   tumor (bounding ellipsoid volume ratio, angular standard deviation, margin fluctuation)
+   are associated with genomic subtype, and the deep-learning masks preserve those
+   associations about as well as the manual masks. This is CPU-only statistics on masks we
+   already predict, so it adds ~0 GPU-hours; it is what makes this a *full* replication.
+
+> **Scope.** **Full replication.** The core pipeline (`prepare-data → make-splits → train →
+> evaluate → shape-features → radiogenomics → figures → report`) reproduces the segmentation
+> number *and* the radiogenomics associations, for a total of ~3–5 GPU-hours. GPU-heavy
+> extras (robustness, quantization, distillation, cross-institution, nnU-Net) are **not
+> required for acceptance** and live in an optional appendix built on the *same* leakage-safe
+> splits. See **Deviations** below.
 
 ---
 
@@ -36,11 +43,17 @@ brain-MRI dataset is BraTS-Africa, Adewole et al. — a different collection.) N
 leakage hazard: the reproduction therefore **trains from random initialization and uses no
 BraTS-derived weights** (see R4).
 
+The dataset also ships **`data.csv`** — one row per patient with the genomic subtype labels
+(`RNASeqCluster`, `MethylationCluster`, `CNCluster`, …) and US-population demographics
+(`race`, `ethnicity`, `neoplasm_histologic_grade`, …) that the radiogenomics reproduction
+(Section 7) and the fairness figure (F7) consume. Blank cells are handled by dropping only the
+affected patient from that specific test.
+
 Download:
 ```bash
 kaggle datasets download -d mateuszbuda/lgg-mri-segmentation
 unzip lgg-mri-segmentation.zip -d data/lgg-mri-segmentation
-# images live under data/lgg-mri-segmentation/kaggle_3m/TCGA_*/
+# images live under data/lgg-mri-segmentation/kaggle_3m/TCGA_*/ ; data.csv sits alongside
 ```
 
 ---
@@ -72,26 +85,36 @@ PYTHONPATH=src python -m lgg.cli make-splits            # or: make-splits --pres
 # 3. Train all folds from scratch (checkpoints every epoch; --resume continues a run).
 PYTHONPATH=src python -m lgg.cli train                  # or: train --fold 0 --resume
 
-# 4. Per-patient (volume-aggregated) Dice/IoU/HD95 — the headline (R2).
+# 4. Per-patient (volume-aggregated) Dice/IoU/HD95 — the segmentation headline (R2).
 PYTHONPATH=src python -m lgg.cli evaluate
 
-# 5. Extensions (all reuse the same leakage-safe splits).
+# 5. Radiogenomics (Section 7) — the full-replication piece, CPU-only, ~0 GPU.
+#    shape-features reconstructs each patient's 3D mask (predicted AND ground truth),
+#    extracts BEVR / angular-std / margin-fluctuation, and joins data.csv labels;
+#    radiogenomics runs Bonferroni-corrected Fisher tests + discrimination AUC for both.
+PYTHONPATH=src python -m lgg.cli shape-features
+PYTHONPATH=src python -m lgg.cli radiogenomics
+
+# 6. Figures F1–F7 (each also writes its underlying CSV) + reports.
+PYTHONPATH=src python -m lgg.cli figures
+PYTHONPATH=src python -m lgg.cli report      # metrics.json + comparison.md (FULL replication)
+
+# Cheap wiring check end-to-end (Section 5), < ~5 min on CPU:
+PYTHONPATH=src python -m lgg.cli smoke
+
+# --- Optional Section-12 GPU extras (NOT required for acceptance) ------------
 PYTHONPATH=src python -m lgg.cli run-robustness
 PYTHONPATH=src python -m lgg.cli quantize
 PYTHONPATH=src python -m lgg.cli distill
 PYTHONPATH=src python -m lgg.cli cross-institution
-
-# 6. Write reports/metrics.json + reports/comparison.md + figures.
-PYTHONPATH=src python -m lgg.cli report
-
-# Cheap wiring check end-to-end (Section 5), < ~5 min on CPU:
-PYTHONPATH=src python -m lgg.cli smoke
+PYTHONPATH=src python -m lgg.cli report      # re-run to fold the extras into metrics.json
 ```
 
 **On Kaggle, run [`kaggle_reproduction.ipynb`](kaggle_reproduction.ipynb)** — a single
-notebook that executes steps 0–6 with checkpoint/resume across the 12-hour session cap and
-writes every metric and figure needed to write the paper. See the notebook header for the
-few knobs (fold preset, epochs, which extensions to run).
+notebook that executes the full-replication core (steps 0–6) with checkpoint/resume across
+the 12-hour session cap and writes every metric and figure needed to write the paper. The
+Section-12 GPU extras are in an optional appendix cell, default **off**
+(`RUN_OPTIONAL_EXTRAS`). See the notebook header for the few knobs (fold preset, epochs).
 
 ---
 
@@ -120,7 +143,9 @@ prediction and ground truth are both empty, 0.0 if exactly one is empty.
 | R7 | Seeds, deterministic cuDNN, pinned deps, single config | `utils.set_seed`, `requirements.txt`, `config.yaml` |
 | R8 | Params, size, VRAM, GPU/CPU latency per volume | `quantize.benchmark_model` |
 | R9 | Explicit channels (3ch pre/FLAIR/post default; FLAIR-only opt) | `data/dataset.py`, `config.data.in_channels` |
-| R10 | ReScience packaging, provenance, deviations, metrics.json + comparison.md | this README, `report.py` |
+| R10 | ReScience packaging, provenance, full-replication statement, deviations, metrics.json + comparison.md | this README, `report.py` |
+| R11 | Figures F1–F9 (F1–F7 required, incl. the automatic-vs-manual discrimination ROC; each with underlying CSV), all from existing outputs | `figures.py` |
+| §7 | Radiogenomics: shape features + Fisher tests + AUC, predicted & GT masks | `shape_features.py`, `radiogenomics.py` |
 
 ---
 
@@ -129,12 +154,14 @@ prediction and ground truth are both empty, 0.0 if exactly one is empty.
 ```
 src/lgg/
   data/{prepare,splits,dataset}.py   models/unet.py
-  metrics.py train.py evaluate.py
-  robustness.py quantize.py distill.py cross_institution.py report.py cli.py
+  metrics.py train.py evaluate.py                       # segmentation core
+  shape_features.py radiogenomics.py                    # Section 7 (full replication)
+  figures.py report.py cli.py                           # figures F1–F7 + reports
+  robustness.py quantize.py distill.py cross_institution.py   # optional Section-12 extras
 tests/test_no_leakage.py             # written before the training loop (R1)
 config.yaml  requirements.txt  splits/  reports/  figures/
-nnunet/                              # optional comparison module (Section 8)
-kaggle_reproduction.ipynb           # single Kaggle notebook, runs everything
+nnunet/                              # optional comparison module (Section 12)
+kaggle_reproduction.ipynb           # single Kaggle notebook, full-replication core + optional appendix
 ```
 
 ---
@@ -167,8 +194,22 @@ across a Kaggle session cap; an ETA to full training is printed after epoch 1.
    legitimate documented alternative (`config.data.in_channels: 1`).
 5. **HD95** requires `medpy`; if it is unavailable the pipeline still runs and reports HD95 as
    not computed.
-6. **Radiogenomics associations (paper's main claim) are out of scope** — this is a partial
-   replication of the segmentation result. Marked clearly here and in `comparison.md`.
+6. **Shape-feature definitions.** The paper's three shape features trace to its reference [6];
+   the exact formulas are not restated in Buda 2019, so we implement the most faithful reading
+   (recorded in [`shape_features.py`](src/lgg/shape_features.py)) and target the **direction and
+   significance** of the genomic associations, not bit-identical feature values:
+   - *Bounding ellipsoid volume ratio (BEVR)* — tumor volume ÷ volume of a PCA-based minimum
+     enclosing ellipsoid (scaled to enclose every voxel, so the ratio stays in (0, 1]).
+   - *Angular standard deviation* — normalized std of the boundary's radial signature about the
+     tumor centroid, on the largest-tumor slice.
+   - *Margin fluctuation* — normalized std of the high-frequency residual of that signature
+     (after a low-order Fourier smooth).
+7. **Isotropic voxels.** The Kaggle dataset ships no per-slice spacing, so voxels are treated as
+   isotropic unit cubes. Every shape feature used is a dimensionless ratio or normalized
+   dispersion, hence scale-invariant to an isotropic voxel size.
+8. **Fisher one-vs-rest + Bonferroni.** Multi-cluster subtypes are tested one cluster-value
+   against the rest (the paper reports exactly this "cluster R2 vs rest" style of contrast), and
+   the full family of (feature × subtype × cluster) tests is Bonferroni-corrected.
 
 Hardware we ran on: _fill in after your Kaggle run_ (e.g. Kaggle P100 16 GB / T4×2, 12-hour
 sessions). The notebook prints per-epoch wall-clock and a measured ETA so real compute is

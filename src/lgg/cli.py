@@ -1,7 +1,9 @@
 """Command-line entry point (R7).
 
-Subcommands: prepare-data, make-splits, train, evaluate, run-nnunet,
-run-robustness, quantize, distill, cross-institution, report, smoke.
+Core (full replication): prepare-data, make-splits, train, evaluate,
+shape-features, radiogenomics, figures, report, smoke.
+Optional (Section 12 GPU extras): run-nnunet, run-robustness, quantize,
+distill, cross-institution.
 
 Everything is driven by ``config.yaml``; flags override individual fields. Run as
 ``python -m lgg.cli <subcommand> [--config config.yaml] [...]``.
@@ -141,6 +143,120 @@ def cmd_evaluate(args):
           f"(paper 0.82 / 0.85)")
 
 
+def _grouped_predictions_all_folds(cfg, df, folds, device):
+    """Run inference over every fold's val patients; return one grouped dict.
+
+    Reuses the evaluation machinery (leakage-safe: each patient is predicted only
+    by the fold that held it out). Slices come back in physical (slice-index)
+    order, so they stack directly into per-patient volumes for shape features.
+    """
+    from .evaluate import _load_model, predict_patients
+
+    in_channels = cfg["data"]["in_channels"]
+    channels = cfg["train"]["channels"]
+    batchnorm = cfg["train"]["batchnorm"]
+    ckpt_for_fold = _ckpt_for_fold(cfg)
+    grouped = {}
+    for fold in folds:
+        model = _load_model(ckpt_for_fold(fold["fold"]), in_channels, channels, batchnorm, device)
+        g = predict_patients(model, df, fold["val"], device, in_channels=in_channels)
+        grouped.update(g)
+        del model
+        import torch
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+    return grouped
+
+
+def cmd_shape_features(args):
+    """Section 7 step 1: extract BEVR / angular-std / margin-fluctuation per patient.
+
+    Runs inference (leakage-safe, one prediction per patient), reconstructs each
+    patient's 3D mask volume for BOTH predicted and ground-truth masks, extracts
+    the three shape features, joins the genomic + demographic labels from
+    data.csv, and writes reports/shape_features_{predicted,ground_truth}.csv.
+    CPU-only statistics downstream; this step is inference-only (~0 training).
+    """
+    from .radiogenomics import (DEMOGRAPHIC_COLUMNS, SUBTYPE_COLUMNS,
+                                 features_to_frame, load_genomic_labels)
+    from .shape_features import features_for_patients
+
+    cfg = _cfg(args)
+    df = _manifest(cfg)
+    folds = _load_folds(cfg)
+    device = get_device()
+    reports = cfg["paths"]["reports"]
+    os.makedirs(reports, exist_ok=True)
+
+    grouped = _grouped_predictions_all_folds(cfg, df, folds, device)
+    labels = load_genomic_labels(cfg["paths"]["datapath"])
+    label_cols = [c for c in (SUBTYPE_COLUMNS + DEMOGRAPHIC_COLUMNS)
+                  if not labels.empty and c in labels.columns]
+
+    for which, tag in (("preds", "predicted"), ("gts", "ground_truth")):
+        feats = features_for_patients(grouped, which=which)
+        fdf = features_to_frame(feats)
+        if label_cols:
+            fdf = fdf.join(labels[label_cols], how="left")
+        out = os.path.join(reports, f"shape_features_{tag}.csv")
+        fdf.to_csv(out, index_label="patient")
+        n_with = int(fdf[["bevr"]].dropna().shape[0]) if "bevr" in fdf else 0
+        print(f"[ok] {tag}: shape features for {n_with}/{len(fdf)} patients -> {out}")
+    if labels.empty:
+        print("[warn] data.csv not found next to the dataset; genomic labels were "
+              "not joined. radiogenomics will be skipped.")
+
+
+def cmd_radiogenomics(args):
+    """Section 7 steps 2-6: Fisher tests + discrimination AUC, predicted vs GT."""
+    from .radiogenomics import (SUBTYPE_COLUMNS, load_genomic_labels,
+                                run_radiogenomics)
+    from .report import write_metrics_json
+    from .shape_features import FEATURE_NAMES
+
+    cfg = _cfg(args)
+    reports = cfg["paths"]["reports"]
+    labels = load_genomic_labels(cfg["paths"]["datapath"])
+    if labels.empty:
+        sys.exit("data.csv not found; cannot run radiogenomics. Place data.csv next "
+                 "to the dataset folder (it ships with the Kaggle set).")
+
+    def _load_feats(tag):
+        p = os.path.join(reports, f"shape_features_{tag}.csv")
+        if not os.path.exists(p):
+            sys.exit(f"{p} missing; run `shape-features` first.")
+        d = pd.read_csv(p).set_index("patient")
+        return {idx: {f: row[f] for f in FEATURE_NAMES if f in row}
+                for idx, row in d.iterrows()}
+
+    pred = _load_feats("predicted")
+    gt = _load_feats("ground_truth")
+    subs = [c for c in SUBTYPE_COLUMNS if c in labels.columns]
+    res = run_radiogenomics(pred, gt, labels, feature_names=FEATURE_NAMES, subtype_cols=subs)
+    write_metrics_json(os.path.join(reports, "radiogenomics.json"), res)
+
+    for mask in ("predicted", "ground_truth"):
+        auc = res["masks"][mask]["discrimination_auc"] or {}
+        best = res["masks"][mask]["associations"]["best_per_pair"]
+        primary = next((r for r in best if r["feature"] == "bevr"
+                        and r["subtype"] == "RNASeqCluster"), None)
+        print(f"\n[{mask}] discrimination AUC (RNASeq {auc.get('target_cluster', '?')} "
+              f"vs rest, inv-BEVR): {auc.get('auc')}")
+        if primary:
+            print(f"[{mask}] RNASeq × BEVR strongest cluster p_bonferroni="
+                  f"{primary['p_bonferroni']:.2e} (raw {primary['p_raw']:.2e})")
+    print("\n[paper] RNASeq×BEVR p<0.0002; RNASeq×margin p<0.005; AUC 0.80 model / 0.78 manual")
+
+
+def cmd_figures(args):
+    """Section 6: generate F1-F7 from already-computed results (~0 GPU)."""
+    from .figures import make_all_figures
+
+    cfg = _cfg(args)
+    made = make_all_figures(cfg)
+    print(f"[ok] wrote {len(made)} figures -> {cfg['paths']['figures']}")
+
+
 def cmd_run_robustness(args):
     from .report import fig_robustness, write_metrics_json
     from .robustness import run_robustness
@@ -248,7 +364,18 @@ def cmd_report(args):
             "in_channels": cfg["data"]["in_channels"], "channels": cfg["train"]["channels"],
             "batchnorm": cfg["train"]["batchnorm"], "epochs": cfg["train"]["epochs"]}
 
+    # Radiogenomics (Section 7) is the load-bearing "full replication" piece; if
+    # present it upgrades the comparison from partial -> full.
+    radiogenomics = None
+    rg_path = os.path.join(reports, "radiogenomics.json")
+    if os.path.exists(rg_path):
+        with open(rg_path) as fh:
+            radiogenomics = json.load(fh)
+
     bundle = {"meta": meta, "headline": summary}
+    if radiogenomics:
+        bundle["radiogenomics"] = radiogenomics
+    # Optional Section-12 extras are folded in only if their JSON already exists.
     for name in ["robustness", "quantization", "distill", "cross_institution"]:
         p = os.path.join(reports, f"{name}.json")
         if os.path.exists(p):
@@ -256,10 +383,12 @@ def cmd_report(args):
                 bundle[name] = json.load(fh)
 
     write_metrics_json(os.path.join(reports, "metrics.json"), bundle)
-    write_comparison_md(os.path.join(reports, "comparison.md"), summary, meta)
+    write_comparison_md(os.path.join(reports, "comparison.md"), summary, meta,
+                        radiogenomics=radiogenomics)
     fig_dice_distribution(per_patient, os.path.join(figures, "dice_distribution.png"))
     fig_dice_by_institution(per_patient, os.path.join(figures, "dice_by_institution.png"))
-    print(f"[ok] wrote {reports}/metrics.json, {reports}/comparison.md and figures.")
+    kind = "FULL" if radiogenomics else "partial"
+    print(f"[ok] wrote {reports}/metrics.json, {reports}/comparison.md ({kind} replication).")
     print(f"[HEADLINE] mean={summary['dice_mean']:.3f} median={summary['dice_median']:.3f} "
           f"vs paper 0.82 / 0.85")
 
@@ -300,6 +429,9 @@ def build_parser():
     sp.add_argument("--epochs", type=int, default=None); sp.add_argument("--resume", action="store_true")
     sp.set_defaults(fn=cmd_train)
     sp = sub.add_parser("evaluate"); sp.add_argument("--no-hd95", action="store_true"); sp.set_defaults(fn=cmd_evaluate)
+    sp = sub.add_parser("shape-features"); sp.set_defaults(fn=cmd_shape_features)
+    sp = sub.add_parser("radiogenomics"); sp.set_defaults(fn=cmd_radiogenomics)
+    sp = sub.add_parser("figures"); sp.set_defaults(fn=cmd_figures)
     sp = sub.add_parser("run-robustness"); sp.set_defaults(fn=cmd_run_robustness)
     sp = sub.add_parser("quantize"); sp.set_defaults(fn=cmd_quantize)
     sp = sub.add_parser("distill"); sp.add_argument("--epochs", type=int, default=None); sp.set_defaults(fn=cmd_distill)
