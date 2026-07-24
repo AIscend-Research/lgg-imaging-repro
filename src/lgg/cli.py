@@ -168,6 +168,35 @@ def _grouped_predictions_all_folds(cfg, df, folds, device):
     return grouped
 
 
+def cmd_deployment(args):
+    """R8: parameter count, on-disk size, peak inference VRAM, GPU + CPU latency.
+
+    Inference-only (~0 GPU) benchmark of the trained model, written to
+    reports/deployment.json and folded into metrics.json / comparison.md by report.
+    """
+    import torch
+
+    from .models.unet import build_unet
+    from .quantize import benchmark_model
+    from .report import write_metrics_json
+
+    cfg = _cfg(args)
+    device = get_device()
+    ckpt = os.path.join(cfg["paths"]["ckpt_dir"], "fold0_best.pt")
+    if not os.path.exists(ckpt):
+        sys.exit(f"{ckpt} missing; run `train` first.")
+    model = build_unet(cfg["train"]["channels"], in_channels=cfg["data"]["in_channels"],
+                       batchnorm=cfg["train"]["batchnorm"]).to(device)
+    model.load_state_dict(torch.load(ckpt, map_location=device)["model"])
+    model.eval()
+    bench = benchmark_model(model, cfg["data"]["in_channels"], device)
+    bench["checkpoint"] = "fold0_best.pt"
+    bench["device"] = device.type
+    os.makedirs(cfg["paths"]["reports"], exist_ok=True)
+    write_metrics_json(os.path.join(cfg["paths"]["reports"], "deployment.json"), bench)
+    print(json.dumps(bench, indent=2))
+
+
 def cmd_shape_features(args):
     """Section 7 step 1: extract BEVR / angular-std / margin-fluctuation per patient.
 
@@ -372,9 +401,17 @@ def cmd_report(args):
         with open(rg_path) as fh:
             radiogenomics = json.load(fh)
 
+    deployment = None
+    dep_path = os.path.join(reports, "deployment.json")
+    if os.path.exists(dep_path):
+        with open(dep_path) as fh:
+            deployment = json.load(fh)
+
     bundle = {"meta": meta, "headline": summary}
     if radiogenomics:
         bundle["radiogenomics"] = radiogenomics
+    if deployment:
+        bundle["deployment"] = deployment
     # Optional Section-12 extras are folded in only if their JSON already exists.
     for name in ["robustness", "quantization", "distill", "cross_institution"]:
         p = os.path.join(reports, f"{name}.json")
@@ -384,7 +421,7 @@ def cmd_report(args):
 
     write_metrics_json(os.path.join(reports, "metrics.json"), bundle)
     write_comparison_md(os.path.join(reports, "comparison.md"), summary, meta,
-                        radiogenomics=radiogenomics)
+                        radiogenomics=radiogenomics, deployment=deployment)
     fig_dice_distribution(per_patient, os.path.join(figures, "dice_distribution.png"))
     fig_dice_by_institution(per_patient, os.path.join(figures, "dice_by_institution.png"))
     kind = "FULL" if radiogenomics else "partial"
@@ -429,6 +466,7 @@ def build_parser():
     sp.add_argument("--epochs", type=int, default=None); sp.add_argument("--resume", action="store_true")
     sp.set_defaults(fn=cmd_train)
     sp = sub.add_parser("evaluate"); sp.add_argument("--no-hd95", action="store_true"); sp.set_defaults(fn=cmd_evaluate)
+    sp = sub.add_parser("deployment"); sp.set_defaults(fn=cmd_deployment)
     sp = sub.add_parser("shape-features"); sp.set_defaults(fn=cmd_shape_features)
     sp = sub.add_parser("radiogenomics"); sp.set_defaults(fn=cmd_radiogenomics)
     sp = sub.add_parser("figures"); sp.set_defaults(fn=cmd_figures)

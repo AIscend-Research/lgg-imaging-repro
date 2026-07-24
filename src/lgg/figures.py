@@ -89,8 +89,9 @@ def fig_qualitative(cfg, out_path: str) -> Optional[str]:
     inference on just those 3 patients, and overlays prediction vs ground truth.
     """
     import torch
+    from PIL import Image
 
-    from .data.dataset import SliceDataset, subset_for_patients
+    from .data.dataset import subset_for_patients
     from .evaluate import predict_patients
     from .models.unet import build_unet
     from .utils import get_device
@@ -144,8 +145,7 @@ def fig_qualitative(cfg, out_path: str) -> Optional[str]:
         areas = [g.sum() for g in d["gts"]]
         k = int(np.argmax(areas)) if max(areas) > 0 else len(areas) // 2
         sub = subset_for_patients(df, [patient])
-        img = np.asarray(__import__("PIL.Image", fromlist=["Image"]).Image.open(
-            sub.iloc[k]["image_path"]).convert("L"), dtype=float)
+        img = np.asarray(Image.open(sub.iloc[k]["image_path"]).convert("L"), dtype=float)
         gt, pr = d["gts"][k], d["preds"][k]
         ax.imshow(img, cmap="gray")
         ax.contour(gt, levels=[0.5], colors="#55A868", linewidths=1.5)

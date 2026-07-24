@@ -204,16 +204,14 @@ def discrimination_auc(
         auc = float(roc_auc_score(y, score))
     except ValueError:
         return None
-    # AUC is symmetric under score inversion; the shape-feature sign convention is
-    # ambiguous (Deviations), so orient the score to the discriminative direction
-    # and keep the matching ROC curve for the F7 figure.
-    if auc < 0.5:
-        score = -score
-        auc = 1.0 - auc
+    # Report the AUC with the feature's FIXED direction (inverse BEVR), exactly as
+    # the paper does — NOT max(auc, 1-auc). Orienting to whichever direction scores
+    # higher is post-hoc and would (a) inflate chance-level results and (b) make the
+    # reported value disagree with a plain roc_auc_score(y, feature) recompute.
     fpr, tpr, _ = roc_curve(y, score)
     return {"subtype": subtype, "feature": feature, "target_cluster": target,
             "auc": auc, "n": int(len(joined)), "n_positive": int(y.sum()),
-            "used_fallback_cluster": used_fallback,
+            "used_fallback_cluster": used_fallback, "orientation": "fixed (inverse BEVR)",
             "roc_fpr": [float(x) for x in fpr], "roc_tpr": [float(x) for x in tpr]}
 
 

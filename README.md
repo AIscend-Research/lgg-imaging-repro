@@ -85,8 +85,10 @@ PYTHONPATH=src python -m lgg.cli make-splits            # or: make-splits --pres
 # 3. Train all folds from scratch (checkpoints every epoch; --resume continues a run).
 PYTHONPATH=src python -m lgg.cli train                  # or: train --fold 0 --resume
 
-# 4. Per-patient (volume-aggregated) Dice/IoU/HD95 — the segmentation headline (R2).
+# 4. Per-patient (volume-aggregated) Dice/IoU/HD95 — the segmentation headline (R2),
+#    then the R8 deployment benchmark (params/size/VRAM/latency; inference-only).
 PYTHONPATH=src python -m lgg.cli evaluate
+PYTHONPATH=src python -m lgg.cli deployment
 
 # 5. Radiogenomics (Section 7) — the full-replication piece, CPU-only, ~0 GPU.
 #    shape-features reconstructs each patient's 3D mask (predicted AND ground truth),
@@ -141,7 +143,7 @@ prediction and ground truth are both empty, 0.0 if exactly one is empty.
 | R5 | Keep all slices; Dice+BCE loss (+ optional fg sampling) | `metrics.dice_bce_loss`, `train.foreground_bias` |
 | R6 | Patient-level k-fold, `buda22` & `kfold5`, seed, saved split | `data/splits.py`, `splits/splits.json` |
 | R7 | Seeds, deterministic cuDNN, pinned deps, single config | `utils.set_seed`, `requirements.txt`, `config.yaml` |
-| R8 | Params, size, VRAM, GPU/CPU latency per volume | `quantize.benchmark_model` |
+| R8 | Params, size, VRAM, GPU/CPU latency per volume | `deployment` subcommand → `reports/deployment.json` (core run) |
 | R9 | Explicit channels (3ch pre/FLAIR/post default; FLAIR-only opt) | `data/dataset.py`, `config.data.in_channels` |
 | R10 | ReScience packaging, provenance, full-replication statement, deviations, metrics.json + comparison.md | this README, `report.py` |
 | R11 | Figures F1–F9 (F1–F7 required, incl. the automatic-vs-manual discrimination ROC; each with underlying CSV), all from existing outputs | `figures.py` |
@@ -210,6 +212,12 @@ across a Kaggle session cap; an ETA to full training is printed after epoch 1.
 8. **Fisher one-vs-rest + Bonferroni.** Multi-cluster subtypes are tested one cluster-value
    against the rest (the paper reports exactly this "cluster R2 vs rest" style of contrast), and
    the full family of (feature × subtype × cluster) tests is Bonferroni-corrected.
+9. **Discrimination AUC uses the feature's fixed direction.** The ROC AUC (cluster vs rest via
+   inverse BEVR) is reported with the feature's a-priori direction, exactly as the paper does —
+   *not* `max(auc, 1−auc)`. Orienting to whichever direction scores higher would be post-hoc and
+   would disagree with a plain `roc_auc_score(y, feature)` recompute. Consequently the reported
+   AUC equals a naive recompute; where predicted and manual masks differ (e.g. manual ≈ paper's
+   0.78 but predicted at chance), that gap is reported honestly rather than masked.
 
 Hardware we ran on: _fill in after your Kaggle run_ (e.g. Kaggle P100 16 GB / T4×2, 12-hour
 sessions). The notebook prints per-epoch wall-clock and a measured ETA so real compute is

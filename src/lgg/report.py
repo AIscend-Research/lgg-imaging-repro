@@ -34,7 +34,8 @@ def _json_default(o):
     raise TypeError(str(type(o)))
 
 
-def write_comparison_md(path: str, summary: dict, meta: dict, radiogenomics: Optional[dict] = None) -> None:
+def write_comparison_md(path: str, summary: dict, meta: dict, radiogenomics: Optional[dict] = None,
+                        deployment: Optional[dict] = None) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     mean_d = summary["dice_mean"]
     med_d = summary["dice_median"]
@@ -75,6 +76,19 @@ def write_comparison_md(path: str, summary: dict, meta: dict, radiogenomics: Opt
 
     if radiogenomics:
         lines.extend(_radiogenomics_md(radiogenomics))
+
+    if deployment:
+        lines.append("## Deployment numbers (R8)\n")
+        lines.append("| Quantity | Value |")
+        lines.append("|---|---|")
+        lines.append(f"| Parameters | {deployment.get('params', 'n/a'):,} ({deployment.get('params_M', 'n/a')} M) |")
+        lines.append(f"| On-disk size | {deployment.get('size_mb', 'n/a')} MB |")
+        if deployment.get("peak_vram_mb") is not None:
+            lines.append(f"| Peak inference VRAM | {deployment['peak_vram_mb']} MB |")
+            lines.append(f"| GPU latency / volume | {deployment.get('gpu_ms_per_volume', 'n/a')} ms |")
+        lines.append(f"| CPU latency / volume | {deployment.get('cpu_ms_per_volume', 'n/a')} ms |")
+        lines.append(f"\n_Benchmarked on {deployment.get('checkpoint', 'the trained model')} "
+                     f"({deployment.get('device', '?')})._\n")
 
     verdict = "within" if abs(mean_d - TARGET_MEAN_DICE) <= 0.03 else "off"
     lines.append(f"**Segmentation verdict:** per-patient mean Dice {mean_d:.3f} is {verdict} the "
