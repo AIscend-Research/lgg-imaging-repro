@@ -1,0 +1,108 @@
+# To be filled by the author(s) at the time of submission
+# -------------------------------------------------------
+
+title: "[Re] Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm"
+
+# List of authors
+authors:
+  - name: Adithya Balakumar
+    orcid: 0009-0002-4035-8704
+    email:
+    affiliations: 1,*
+
+  - name: Spursh Deshpande
+    orcid: 0009-0002-5344-0694
+    email:
+    affiliations: 2
+
+  - name: Wenhao Lu
+    orcid: 0009-0001-6517-8745
+    email:
+    affiliations: 1
+
+# Affiliations
+affiliations:
+  - code: 1
+    name: Millburn High School
+    address: Millburn, NJ, USA
+
+  - code: 2
+    name: Crescenta Valley High School
+    address: La Crescenta, CA, USA
+
+# Keywords
+keywords:
+  - Fourier Neural Operator
+  - LiteFNO
+  - Reproducibility
+  - Neural Operator
+  - CNN ablation
+  - Scientific Machine Learning
+  - PDE surrogate
+  - Gray-Scott
+
+# Code
+code:
+  - url: https://github.com/AIscend-Research/litefno-repro
+  - doi: 10.5281/zenodo.20793536
+
+# Data (remove or leave empty if you don't have a separate dataset DOI)
+data: []
+
+# Original paper being reproduced
+replication:
+  - cite: "Buda, M., Saha, A., & Mazurowski, M. A. (2019). Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm. Computers in Biology and Medicine, 109, 218-225."
+  - doi: 10.1016/j.compbiomed.2019.05.002
+
+# Abstract
+abstract: "We study LiteFNO (Ahn et al., 2025), a lightweight Fourier Neural Operator for time-dependent PDEs, through a from-scratch reproducibility study and a novel ablation study. We reimplement the architecture (no public code was available) and introduce a parameter-matched low-rank CNN baseline absent from the original paper. Across three random seeds on the Gray-Scott dataset at 32×32 resolution, the CNN matches or outperforms LiteFNO on one-step VRMSE and autoregressive rollout, providing no consistent evidence for a Fourier inductive bias advantage at this scale. We confirm the 'compact beats dense' claim while documenting implementation ambiguities."
+
+# Bibliography
+bibliography: bibliography.bib
+
+# Article type
+type: Reproduction
+
+# Domain
+domain: Medical Imaging
+
+# Language
+language: Python
+
+
+# To be filled by the author(s) after acceptance
+# -----------------------------------------------------------------------------
+
+# For example, the URL of the GitHub issue where review actually occured
+review:
+  - url:
+
+contributors:
+  - name:
+    orcid:
+    role: editor
+  - name:
+    orcid:
+    role: reviewer
+  - name:
+    orcid:
+    role: reviewer
+
+# This information will be provided by the editor
+dates:
+  - received:  November 1, 2018
+  - accepted:
+  - published:
+
+# This information will be provided by the editor
+article:
+  - number: # Article number will be automatically assigned during publication
+  - doi:    # DOI from Zenodo
+  - url:    # Final PDF URL (Zenodo or rescience website?)
+
+# This information will be provided by the editor
+journal:
+  - name:   "ReScience C"
+  - issn:   2430-3658
+  - volume: 4
+  - issue:  1
