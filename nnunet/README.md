@@ -17,8 +17,10 @@ To keep the comparison apples-to-apples and leakage-free:
 4. **Same per-patient metrics.** Evaluate with the R2 per-patient volume-aggregated Dice
    (reuse `lgg.metrics`) so the number is directly comparable to the U-Net reproduction.
 
-The existing `../nnunet_results/` tree contains an earlier reduced-epoch nnU-Net run kept
-for reference; regenerate it through the steps above if you want a leakage-audited number.
+An earlier reduced-epoch nnU-Net run is archived under
+[`../legacy/nnunet_results/`](../legacy/nnunet_results) for reference only — it predates
+these steps and is **not** leakage-audited against `../splits/splits.json`. Regenerate it
+through the steps above if you want a comparable number.
 
 **Warning:** never run default (1000-epoch) nnU-Net at full length on Kaggle — five folds is
 ~100–150 h and blows the weekly quota.

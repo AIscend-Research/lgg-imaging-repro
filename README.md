@@ -158,13 +158,21 @@ src/lgg/
   data/{prepare,splits,dataset}.py   models/unet.py
   metrics.py train.py evaluate.py                       # segmentation core
   shape_features.py radiogenomics.py                    # Section 7 (full replication)
-  figures.py report.py cli.py                           # figures F1–F7 + reports
+  figures.py report.py cli.py                           # figures F1–F9 + reports
   robustness.py quantize.py distill.py cross_institution.py   # optional Section-12 extras
 tests/test_no_leakage.py             # written before the training loop (R1)
-config.yaml  requirements.txt  splits/  reports/  figures/
-nnunet/                              # optional comparison module (Section 12)
-kaggle_reproduction.ipynb           # single Kaggle notebook, full-replication core + optional appendix
+config.yaml                          # single source of truth for every run
+requirements.txt                     # pinned environment (R7)
+metadata.yaml                        # ReScience C submission metadata
+kaggle_reproduction.ipynb            # single Kaggle notebook: full-replication core + optional appendix
+nnunet/                              # optional comparison module (Section 12), docs only
+splits/ reports/ figures/            # generated outputs (empty until you run the pipeline)
+legacy/                              # archived earlier nnU-Net study — NOT part of this submission
 ```
+
+Everything outside `legacy/` is used by the reproduction. `legacy/` holds a separate, earlier
+project (different method and framing, including an incorrect "African dataset" description)
+kept only for reference — see [`legacy/README.md`](legacy/README.md).
 
 ---
 
