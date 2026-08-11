@@ -57,7 +57,7 @@ data:
 replication:
   - cite: "Buda, M., Saha, A., & Mazurowski, M. A. (2019). Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm. Computers in Biology and Medicine, 109, 218-225."
   - bib: Buda:2019
-  - url: https://doi.org/10.1016/j.compbiomed.2019.05.002
+  - url: https://arxiv.org/abs/1906.03720   # open-access author preprint (arXiv:1906.03720v1)
   - doi: 10.1016/j.compbiomed.2019.05.002
 
 # Abstract
