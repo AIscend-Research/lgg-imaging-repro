@@ -1,14 +1,14 @@
 # To be filled by the author(s) at the time of submission
 # -------------------------------------------------------
 
-title: "[Re] Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm"
+title: "[¬Re] Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm"
 
 # List of authors
 authors:
   - name: Adithya Balakumar
     orcid: 0009-0002-4035-8704
     email:
-    affiliations: 1,*
+    affiliations: 1
 
   - name: Spursh Deshpande
     orcid: 0009-0002-5344-0694
@@ -17,8 +17,8 @@ authors:
 
   - name: Wenhao Lu
     orcid: 0009-0001-6517-8745
-    email:
-    affiliations: 1
+    email: wenhao@nxthorizon.org
+    affiliations: 1,*
 
 # Affiliations
 affiliations:
@@ -32,36 +32,42 @@ affiliations:
 
 # Keywords
 keywords:
-  - Fourier Neural Operator
-  - LiteFNO
+  - Radiogenomics
+  - Lower-grade glioma
+  - TCGA-LGG
+  - Medical image segmentation
+  - U-Net
+  - Shape features
+  - Bounding ellipsoid volume ratio
+  - Failed replication
   - Reproducibility
-  - Neural Operator
-  - CNN ablation
-  - Scientific Machine Learning
-  - PDE surrogate
-  - Gray-Scott
 
 # Code
 code:
-  - url: https://github.com/AIscend-Research/litefno-repro
-  - doi: 10.5281/zenodo.20793536
+  - url: https://github.com/AIscend-Research/lgg-imaging-repro
+  - doi:
+  - swh:
 
 # Data (remove or leave empty if you don't have a separate dataset DOI)
-data: []
+data:
+  - url: https://www.kaggle.com/datasets/mateuszbuda/lgg-mri-segmentation
+  - doi:
 
 # Original paper being reproduced
 replication:
   - cite: "Buda, M., Saha, A., & Mazurowski, M. A. (2019). Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm. Computers in Biology and Medicine, 109, 218-225."
+  - bib: Buda:2019
+  - url: https://doi.org/10.1016/j.compbiomed.2019.05.002
   - doi: 10.1016/j.compbiomed.2019.05.002
 
 # Abstract
-abstract: "We study LiteFNO (Ahn et al., 2025), a lightweight Fourier Neural Operator for time-dependent PDEs, through a from-scratch reproducibility study and a novel ablation study. We reimplement the architecture (no public code was available) and introduce a parameter-matched low-rank CNN baseline absent from the original paper. Across three random seeds on the Gray-Scott dataset at 32×32 resolution, the CNN matches or outperforms LiteFNO on one-step VRMSE and autoregressive rollout, providing no consistent evidence for a Fourier inductive bias advantage at this scale. We confirm the 'compact beats dense' claim while documenting implementation ambiguities."
+abstract: "Buda, Saha and Mazurowski (2019) trained a U-Net to segment lower-grade gliomas in 110 patients from The Cancer Genome Atlas and reported a mean per-patient Dice of 0.82 and a median of 0.85. Their central claim is not the segmentation number but what follows from it: shape features measured on the automatically produced masks remain associated with genomic subtype about as strongly as the same features measured on manual masks, with an AUC of 0.80 against 0.78 for separating RNASeq cluster R2 from the rest. We reimplemented the pipeline from the published description and evaluated it on the same 110 patients under patient-level five-fold cross-validation. Segmentation came close on the median (0.808) and short on the mean (0.707), the gap being driven by six patients the model missed almost completely. On the manual masks the radiogenomic association held: bounding ellipsoid volume ratio against RNASeq cluster gave an uncorrected Fisher p of 0.0005 and the manual-mask discrimination AUC was 0.764, close to the reported 0.78. On our predicted masks it disappeared. No feature-by-subtype pair survived Bonferroni correction and the AUC fell to 0.455. Discarding the badly segmented patients did not recover it, because bounding ellipsoid volume ratio computed on predicted masks is uncorrelated with the same feature computed on manual masks even when segmentation is good (r = -0.01 for patients above 0.5 Dice). We report this as a failed replication of the paper's central claim and argue that the shape features are considerably more fragile under segmentation error than the original numbers suggest."
 
 # Bibliography
 bibliography: bibliography.bib
 
 # Article type
-type: Reproduction
+type: Replication
 
 # Domain
 domain: Medical Imaging
@@ -90,7 +96,7 @@ contributors:
 
 # This information will be provided by the editor
 dates:
-  - received:  November 1, 2018
+  - received:
   - accepted:
   - published:
 
@@ -104,5 +110,5 @@ article:
 journal:
   - name:   "ReScience C"
   - issn:   2430-3658
-  - volume: 4
+  - volume: 12
   - issue:  1
