@@ -20,6 +20,11 @@ authors:
     email: wenhao@nxthorizon.org
     affiliations: 1,*
 
+  - name: Jayvant Rajesh
+    orcid: 0009-0001-4232-3065
+    email: 
+    affiliations: 3
+
 # Affiliations
 affiliations:
   - code: 1
@@ -29,6 +34,10 @@ affiliations:
   - code: 2
     name: Crescenta Valley High School
     address: La Crescenta, CA, USA
+
+  - code: 2
+    name: Heritage High School
+    address: Brentwood, CA, USA
 
 # Keywords
 keywords:
